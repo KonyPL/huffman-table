@@ -20,22 +20,18 @@ import huffmancoding
 # Command line main application function.
 def main(args):
 	# Handle command line arguments
-	# if len(args) != 2:
-	# 	sys.exit("Usage: python huffman-compress.py InputFile OutputFile")
-	# inputfile, outputfile = args
-
-	inputfile = "input.txt"
-	outputfile = "out"
+	if len(args) != 2:
+		sys.exit("Usage: python huffman-compress.py InputFile OutputFile")
+	inputfile, outputfile = args
 	
 	# Read input file once to compute symbol frequencies.
 	# The resulting generated code is optimal for static Huffman coding and also canonical.
 	freqs = get_frequencies(inputfile)
 	freqs.increment(256)  # EOF symbol gets a frequency of 1
-	code = freqs.build_code_tree()
+	code = freqs.build_code_table()
 	canoncode = huffmancoding.CanonicalCode(tree=code, symbollimit=freqs.get_symbol_limit())
 	# Replace code tree with canonical one. For each symbol,
 	# the code value may change but the code length stays the same.
-	code = canoncode.to_code_tree()
 	
 	# Read input file again, compress with Huffman coding, and write output file
 	with open(inputfile, "rb") as inp, \
