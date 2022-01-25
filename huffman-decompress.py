@@ -17,10 +17,14 @@ import huffmancoding
 # Command line main application function.
 def main(args):
 	# Handle command line arguments
-	if len(args) != 2:
-		sys.exit("Usage: python huffman-decompress.py InputFile OutputFile")
-	inputfile, outputfile = args
+	# if len(args) != 2:
+	# 	sys.exit("Usage: python huffman-decompress.py InputFile OutputFile")
+	# inputfile, outputfile = args
 	
+	inputfile = "out2.txt"
+	outputfile = "deco.txt"
+	
+
 	# Perform file decompression
 	with open(inputfile, "rb") as inp, open(outputfile, "wb") as out:
 		bitin = huffmancoding.BitInputStream(inp)

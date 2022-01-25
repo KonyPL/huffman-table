@@ -85,13 +85,8 @@ class FrequencyTable:
 	
 	# Returns the number of symbols in this frequency table. The result is always at least 2.
 	def get_symbol_limit(self):
-		symbols = 0
-		for symbol in self.frequencies:
-			if symbol > 0 :
-				symbols += 1
-		return symbols
-	
-	
+		return len(self.frequencies)
+
 	# Returns the frequency of the given symbol in this frequency table. The result is always non-negative.
 	def get(self, symbol):
 		self._check_symbol(symbol)
@@ -127,6 +122,15 @@ class FrequencyTable:
 		for (i, freq) in enumerate(self.frequencies):
 			result += "{}\t{}\n".format(i, freq)
 		return result
+
+	def get_linked_code(self,list, huff_table, id):
+		if(huff_table[huff_table[id][2]][2] == None):
+			list.append(huff_table[id][1])
+			return list
+		else:
+			list = self.get_linked_code(list, huff_table, huff_table[id][2])
+			list.append(huff_table[id][1])
+			return list
 	
 
 	def build_code_table(self):
@@ -136,30 +140,67 @@ class FrequencyTable:
 		# Each item in the priority queue is a tuple of type (int frequency,
 		# int lowestSymbol, Node node). As per Python rules, tuples are ordered asceding
 		# by the lowest differing index, e.g. (0, 0) < (0, 1) < (0, 2) < (1, 0) < (1, 1).
-		table = [
+
+		#create table with symbol frequenices > 0, count the probability of each symbol and sort them lowest to highest
+		#table consists of two rows [frequency_id, probability]
+		table = []
 		
-		# Add leaves for symbols with non-zero frequency
+		all_symbols = 0
+		everything = 0
+
 		for (i, freq) in enumerate(self.frequencies):
 			if freq > 0:
-				heapq.heappush(pqueue, (freq, i, Leaf(i)))
+				table.append([i,freq])
+				all_symbols += freq
+
+		table = sorted(table, key= lambda x:x[1])
+
+		for col in table:
+			col[1] = col[1] / all_symbols
+			everything += col[1]
+
+		#make 2N - 1 list for calculations
+		huff_table = []
+		for i in range(2 * len(table) - 1):
+			if i < len(table):
+				huff_table.append([table[i][1], None, None])
+			else:
+				huff_table.append([None, None, None])
+
+		next_empty = len(table)
+		while(huff_table[len(huff_table) - 1][0] is None):
+			min1 = [None, 1.0]
+			min2 = [None, 1.0]
+			for i in range(next_empty):
+				if( huff_table[i][0] < min1[1] and huff_table[i][1] is None):
+					min1 = [i, huff_table[i][0]]
+			
+			for i in range(min1[0] + 1, next_empty):
+				if( huff_table[i][0] < min2[1] and huff_table[i][1] is None):
+					min2 = [i, huff_table[i][0]]
+
+			huff_table[next_empty][0] = min1[1] + min2[1]
+			#add Binary value and link
+			huff_table[min1[0]][1] = 0
+			huff_table[min1[0]][2] = next_empty
+			huff_table[min2[0]][1] = 1
+			huff_table[min2[0]][2] = next_empty
+
+			next_empty += 1
+
+		#read boolean values
+		boolean_table = []
+		for i in range(257):
+			boolean_table.append(None)
+
+		#get code from linked columns and revert
+		for i in range(len(table)):
+			code = []
+			code = self.get_linked_code(code, huff_table, i)
+			boolean_table[table[i][0]] = tuple(code)
 		
-		# Pad with zero-frequency symbols until queue has at least 2 items
-		for (i, freq) in enumerate(self.frequencies):
-			if len(pqueue) >= 2:
-				break
-			if freq == 0:
-				heapq.heappush(pqueue, (freq, i, Leaf(i)))
-		assert len(pqueue) >= 2
 		
-		# Repeatedly tie together two nodes with the lowest frequency
-		while len(pqueue) > 1:
-			x = heapq.heappop(pqueue)  # Tuple of (frequency, lowest symbol, node object)
-			y = heapq.heappop(pqueue)  # Tuple of (frequency, lowest symbol, node object)
-			z = (x[0] + y[0], min(x[1], y[1]), InternalNode(x[2], y[2]))  # Construct new tuple
-			heapq.heappush(pqueue, z)
-		
-		# Return the remaining node
-		return CodeTree(pqueue[0][2], len(self.frequencies))
+		return CodeTree(boolean_table, len(self.frequencies))
 	
 	# Returns a code tree that is optimal for the symbol frequencies in this table.
 	# The tree always contains at least 2 leaves (even if they come from symbols with
@@ -225,32 +266,17 @@ class CodeTree:
 	
 	# Constructs a code tree from the given tree of nodes and given symbol limit.
 	# Each symbol in the tree must have value strictly less than the symbol limit.
-	def __init__(self, root, symbollimit):
-		# Recursive helper function
-		def build_code_list(node, prefix):
-			if isinstance(node, InternalNode):
-				build_code_list(node.leftchild , prefix + (0,))
-				build_code_list(node.rightchild, prefix + (1,))
-			elif isinstance(node, Leaf):
-				if node.symbol >= symbollimit:
-					raise ValueError("Symbol exceeds symbol limit")
-				if self.codes[node.symbol] is not None:
-					raise ValueError("Symbol has more than one code")
-				self.codes[node.symbol] = prefix
-			else:
-				raise AssertionError("Illegal node type")
-		
+	def __init__(self, code, symbollimit):
+	
 		if symbollimit < 2:
 			raise ValueError("At least 2 symbols needed")
-		# The root node of this code tree
-		self.root = root
-		# Stores the code for each symbol, or None if the symbol has no code.
+		
 		# For example, if symbol 5 has code 10011, then codes[5] is the tuple (1,0,0,1,1).
-		self.codes = [None] * symbollimit
-		build_code_list(root, ())  # Fill 'codes' with appropriate data
+		self.codes = code
 	
 	
 	# Returns the Huffman code for the given symbol, which is a sequence of 0s and 1s.
+
 	def get_code(self, symbol):
 		if symbol < 0:
 			raise ValueError("Illegal symbol")
@@ -259,22 +285,6 @@ class CodeTree:
 		else:
 			return self.codes[symbol]
 	
-	
-	# Returns a string representation of this code tree,
-	# useful for debugging only, and the format is subject to change.
-	def __str__(self):
-		# Recursive helper function
-		def to_str(prefix, node):
-			if isinstance(node, InternalNode):
-				return to_str(prefix + "0", node.leftchild) + to_str(prefix + "0", node.rightchild)
-			elif isinstance(node, Leaf):
-				return "Code {}: Symbol {}\n".format(prefix, node.symbol)
-			else:
-				raise AssertionError("Illegal node type")
-		
-		return to_str("", self.root)
-
-
 
 # A node in a code tree. This class has exactly two subclasses: InternalNode, Leaf.
 class Node:
@@ -383,26 +393,15 @@ class CanonicalCode:
 			self.codelengths = list(codelengths)
 		
 		elif tree is not None and symbollimit is not None and codelengths is None:
-			# Recursive helper method
-			def build_code_lengths(node, depth):
-				if isinstance(node, InternalNode):
-					build_code_lengths(node.leftchild , depth + 1)
-					build_code_lengths(node.rightchild, depth + 1)
-				elif isinstance(node, Leaf):
-					if node.symbol >= len(self.codelengths):
-						raise ValueError("Symbol exceeds symbol limit")
-					# Note: CodeTree already has a checked constraint that disallows a symbol in multiple leaves
-					if self.codelengths[node.symbol] != 0:
-						raise AssertionError("Symbol has more than one code")
-					self.codelengths[node.symbol] = depth
-				else:
-					raise AssertionError("Illegal node type")
-			
 			if symbollimit < 2:
 				raise ValueError("At least 2 symbols needed")
 			self.codelengths = [0] * symbollimit
-			build_code_lengths(tree.root, 0)
-		
+			for i in range(symbollimit):
+				if tree.codes[i] == None:
+					self.codelengths[i] = 0
+				else:
+					self.codelengths[i] = len(tree.codes[i])
+				
 		else:
 			raise ValueError("Invalid arguments")
 	
