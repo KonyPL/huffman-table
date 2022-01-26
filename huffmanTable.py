@@ -1,4 +1,5 @@
 import os
+import pickle
 
 class HuffmanTable:
     def __init__(self, path):
@@ -146,6 +147,7 @@ class HuffmanTable:
     def compress(self):
         filename, file_extension = os.path.splitext(self.path)
         output_path = filename + ".bin"
+        dict_path = filename + "_huffman_codes.bin"
 
         with open(self.path, 'r+') as file, open(output_path, 'wb') as output:
             text = file.read()
@@ -160,6 +162,11 @@ class HuffmanTable:
 
             b = self.get_byte_array(padded_encoded_text)
             output.write(bytes(b))
+
+        dict_file = open(dict_path, 'wb')
+        pickle.dump(self.codes, dict_file)
+        dict_file.close()
+        self.codes = {}
 
         print("Compressed")
         return output_path
@@ -234,6 +241,11 @@ class HuffmanTable:
     def decompress(self, input_path):
         filename, file_extension = os.path.splitext(self.path)
         output_path = filename + "_decompressed" + ".txt"
+        dict_path = filename + "_huffman_codes.bin"
+
+        dict_file = open(dict_path, 'rb')
+        self.codes = pickle.load(dict_file)
+        dict_file.close()
 
         with open(input_path, 'rb') as file, open(output_path, 'w') as output:
             bit_string = ""
