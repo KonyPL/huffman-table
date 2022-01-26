@@ -1,7 +1,7 @@
 from huffmanTable import HuffmanTable
 import sys
 
-path = "text.txt"
+path = "litPL.txt"
 
 h = HuffmanTable(path)
 
